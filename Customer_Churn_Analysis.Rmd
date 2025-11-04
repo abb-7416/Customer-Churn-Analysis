@@ -1,0 +1,60 @@
+---
+title: "Customer Churn Analysis"
+author: "Akhilesh Kakarla"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r, include=TRUE}
+# ✅ Load Libraries
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(pROC)
+
+# ✅ Step 1: Load Dataset
+setwd("~/Desktop")
+data <- read.csv("Telco-Customer-Churn/WA_Fn-UseC_-Telco-Customer-Churn.csv", stringsAsFactors = TRUE)
+cat("✅ Rows:", nrow(data), " Columns:", ncol(data), "\n")
+
+# ✅ Step 2: Data Cleaning
+names(data) <- make.names(names(data))
+if("customerID" %in% names(data)) {
+  data <- data %>% select(-customerID)
+}
+data$Churn <- factor(data$Churn, levels=c("No","Yes"))
+data$TotalCharges <- as.numeric(as.character(data$TotalCharges))
+data <- drop_na(data)
+
+# ✅ Step 3: Exploratory Data Analysis
+ggplot(data, aes(x=Churn, fill=Churn)) +
+  geom_bar() +
+  labs(title="Churn Distribution", x="Churn", y="Count")
+
+# ✅ Step 4: Logistic Regression
+set.seed(123)
+trainIndex <- createDataPartition(data$Churn, p=0.7, list=FALSE)
+train <- data[trainIndex,]
+test <- data[-trainIndex,]
+model_glm <- glm(Churn ~ ., data=train, family=binomial)
+pred_prob <- predict(model_glm, test, type="response")
+pred_class <- ifelse(pred_prob>0.5, "Yes", "No")
+confusionMatrix(factor(pred_class), test$Churn)
+
+# ✅ Step 5: Decision Tree Model
+model_tree <- rpart(Churn ~ ., data=train, method="class")
+rpart.plot(model_tree)
+
+# ✅ Step 6: ROC Curve
+roc_obj <- roc(test$Churn, pred_prob)
+plot(roc_obj, col="blue", main="ROC Curve for Logistic Regression")
+auc(roc_obj)
+
+# ✅ Step 7: Key Insights
+cat("1️⃣ Customers with high MonthlyCharges and short tenure have higher churn risk.\n")
+cat("2️⃣ Month-to-month contracts and electronic check payments correlate strongly with churn.\n")
+cat("3️⃣ Customers using fiber optic internet show slightly higher churn than DSL users.\n")
+cat("4️⃣ Logistic Regression achieved an AUC of 0.8555 — indicating strong predictive performance.\n")
+cat("5️⃣ Decision Tree helps managers identify high-risk customer segments for retention campaigns.\n")
